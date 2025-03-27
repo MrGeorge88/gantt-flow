@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import _ from 'lodash';
+import './GanttChart.css';
 
 const GanttApp = () => {
   // Datos de ejemplo basados en la imagen
@@ -438,124 +439,110 @@ const GanttApp = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen font-sans">
+    <div className="gantt-container">
       {/* Header con logo y título */}
-      <div className="flex p-3 border-b border-gray-200 bg-white items-center">
-        <div className="w-10 h-10 bg-indigo-900 rounded flex justify-center items-center text-white mr-4">
+      <div className="gantt-header">
+        <div className="gantt-logo">
           ≡
         </div>
-        <div className="flex items-center justify-between w-full">
-          <div className="text-lg font-bold">Email Marketing</div>
+        <div className="gantt-title-bar">
+          <div className="gantt-project-title">Email Marketing</div>
           <div>⭐</div>
         </div>
       </div>
       
       {/* Selector de vistas */}
-      <div className="flex border-b border-gray-200 px-4">
-        <div className={`py-2 px-4 cursor-pointer relative ${activeView === 'Gantt' ? 'border-b-2 border-blue-500 text-blue-500 font-bold' : ''}`}>
+      <div className="gantt-view-selector">
+        <div className={`gantt-view-option ${activeView === 'Gantt' ? 'gantt-view-active' : ''}`}>
           📊 Gantt
         </div>
-        <div className="py-2 px-4 cursor-pointer">📋 Table</div>
-        <div className="py-2 px-4 cursor-pointer">📌 Board</div>
-        <div className="py-2 px-4 cursor-pointer">👥 Workload</div>
-        <div className="py-2 px-4 cursor-pointer">📈 Overview</div>
+        <div className="gantt-view-option">📋 Table</div>
+        <div className="gantt-view-option">📌 Board</div>
+        <div className="gantt-view-option">👥 Workload</div>
+        <div className="gantt-view-option">📈 Overview</div>
       </div>
       
       {/* Toolbar con botones */}
-      <div className="flex p-2 border-b border-gray-200 bg-gray-100 items-center">
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white mr-2 flex items-center text-sm">
-          Export & Share ▼
-        </div>
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white mr-2 flex items-center text-sm">
-          Baselines ▼
-        </div>
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white mr-2 flex items-center text-sm">
-          Options ▼
-        </div>
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white mr-2 flex items-center text-sm">
-          Columns ▼
-        </div>
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white mr-2 flex items-center text-sm">
-          Segments ▼
-        </div>
-        <div className="w-5"></div>
-        <div className="px-3 py-1.5 rounded bg-yellow-200 mr-2 flex items-center text-sm">
-          ⚡ Manual
-        </div>
-        <div className="flex-1"></div>
-        <div className="px-3 py-1.5 border border-gray-300 rounded bg-white text-sm">
-          Apr 2019
-        </div>
+      <div className="gantt-toolbar">
+        <div className="gantt-button">Export & Share ▼</div>
+        <div className="gantt-button">Baselines ▼</div>
+        <div className="gantt-button">Options ▼</div>
+        <div className="gantt-button">Columns ▼</div>
+        <div className="gantt-button">Segments ▼</div>
+        <div className="gantt-spacer"></div>
+        <div className="gantt-manual-button">⚡ Manual</div>
+        <div className="gantt-flexer"></div>
+        <div className="gantt-button">Apr 2019</div>
       </div>
       
       {/* Contenido principal */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="gantt-content">
         {/* Panel izquierdo: Lista de tareas */}
-        <div className="w-2/5 overflow-auto border-r border-gray-200">
+        <div className="gantt-task-list">
           {/* Barra de búsqueda */}
-          <div className="flex items-center p-3 border-b border-gray-200">
+          <div className="gantt-search-bar">
             <input 
               type="text" 
               placeholder="Search tasks..." 
-              className="w-full p-1.5 border border-gray-300 rounded"
+              className="gantt-search-input"
             />
           </div>
           
           {/* Cabeceras de columna */}
-          <div className="flex p-3 border-b border-gray-200 bg-gray-50 font-bold text-sm">
-            <div className="flex-3">Task Name</div>
-            <div className="flex-1 text-center">Assigned</div>
-            <div className="flex-1 text-center">EH</div>
-            <div className="flex-1 text-center">Start</div>
-            <div className="flex-1 text-center">Due</div>
-            <div className="flex-1 text-center">%</div>
+          <div className="gantt-column-headers">
+            <div className="gantt-column-name">Task Name</div>
+            <div className="gantt-column-center">Assigned</div>
+            <div className="gantt-column-center">EH</div>
+            <div className="gantt-column-center">Start</div>
+            <div className="gantt-column-center">Due</div>
+            <div className="gantt-column-center">%</div>
           </div>
           
           {/* Lista de tareas */}
           {getVisibleTasks().map(task => (
             <div 
               key={task.id} 
-              className={`flex ${task.isPhase ? 'bg-gray-100 font-bold p-2.5 border-b border-gray-300' : 'p-2 border-b border-gray-100'} items-center`}
+              className={task.isPhase ? "gantt-phase-row" : "gantt-task-row"}
               onClick={() => task.isPhase && togglePhase(task.id)}
             >
               {task.isPhase ? (
                 <>
-                  <div className="mr-2.5">▶</div>
-                  <div className="flex-3">{task.name}</div>
-                  <div className="flex-1"></div>
-                  <div className="flex-1 text-center">{task.effort}</div>
-                  <div className="flex-1 text-center">{task.startDate}</div>
-                  <div className="flex-1 text-center">{task.endDate}</div>
-                  <div className="flex-1 text-center">{task.progress}%</div>
+                  <div className="gantt-phase-icon">▶</div>
+                  <div className="gantt-task-name">{task.name}</div>
+                  <div className="gantt-column-center"></div>
+                  <div className="gantt-column-center">{task.effort}</div>
+                  <div className="gantt-column-center">{task.startDate}</div>
+                  <div className="gantt-column-center">{task.endDate}</div>
+                  <div className="gantt-column-center">{task.progress}%</div>
                 </>
               ) : (
                 <>
-                  <input type="checkbox" className="mr-2.5" checked={task.progress === 100} readOnly />
-                  <div className="flex-3">{task.name}</div>
-                  <div className="flex-1 flex justify-center">
+                  <input type="checkbox" className="gantt-task-checkbox" checked={task.progress === 100} readOnly />
+                  <div className="gantt-task-name">{task.name}</div>
+                  <div className="gantt-column-center">
                     {task.assignee !== 'Unassigned' && (
-                      <div className="w-6 h-6 rounded-full bg-blue-500 flex justify-center items-center text-white text-xs font-bold">
+                      <div className="gantt-avatar">
                         {getInitials(task.assignee)}
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 text-center">{task.effort}</div>
-                  <div className="flex-1 text-center">{task.startDate}</div>
-                  <div className="flex-1 text-center">{task.endDate}</div>
-                  <div className="flex-1 text-center">{task.progress}%</div>
+                  <div className="gantt-column-center">{task.effort}</div>
+                  <div className="gantt-column-center">{task.startDate}</div>
+                  <div className="gantt-column-center">{task.endDate}</div>
+                  <div className="gantt-column-center">{task.progress}%</div>
                 </>
               )}
             </div>
           ))}
           
           {/* Botón para añadir tarea */}
-          <button className="m-3 px-3 py-1.5 bg-blue-500 text-white border-none rounded cursor-pointer">
+          <button className="gantt-add-button">
             + Add task
           </button>
         </div>
         
         {/* Panel derecho: Vista de Gantt */}
-        <div className="w-3/5 overflow-auto">
+        <div className="gantt-view">
           <svg width={chartWidth} height={ganttConfig.headerHeight + (getVisibleTasks().length * ganttConfig.rowHeight)}>
             {renderGanttHeader()}
             {renderTaskBars()}

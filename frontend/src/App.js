@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import GanttChart from './components/GanttChart';
 import Login from './components/auth/Login';
+import Register from './components/auth/Register';
+import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     // Verificar si hay un usuario en localStorage
@@ -17,6 +20,7 @@ function App() {
 
   const handleLogin = (userData) => {
     setUser(userData);
+    setShowRegister(false);
   };
 
   const handleLogout = () => {
@@ -26,20 +30,20 @@ function App() {
   };
 
   if (isLoading) {
-    return <div>Cargando...</div>;
+    return <div className="loading">Cargando...</div>;
   }
 
   return (
-    <div className="App">
+    <div className="app">
       {user ? (
-        <div className="flex flex-col h-screen">
-          <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
-            <h1 className="text-xl font-bold">GanttFlow</h1>
-            <div className="flex items-center">
-              <span className="mr-4">Hola, {user.name}</span>
+        <div className="app-container">
+          <div className="app-header">
+            <h1 className="app-title">GanttFlow</h1>
+            <div className="user-info">
+              <span className="user-greeting">Hola, {user.name}</span>
               <button 
                 onClick={handleLogout}
-                className="bg-blue-500 px-3 py-1 rounded hover:bg-blue-400"
+                className="logout-button"
               >
                 Cerrar sesión
               </button>
@@ -48,7 +52,17 @@ function App() {
           <GanttChart />
         </div>
       ) : (
-        <Login onLogin={handleLogin} />
+        showRegister ? (
+          <Register 
+            onLogin={handleLogin} 
+            onBackToLogin={() => setShowRegister(false)} 
+          />
+        ) : (
+          <Login 
+            onLogin={handleLogin} 
+            onRegister={() => setShowRegister(true)} 
+          />
+        )
       )}
     </div>
   );

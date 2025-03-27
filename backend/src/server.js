@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 
 // Importar rutas
 const userRoutes = require('./routes/userRoutes');
+const projectRoutes = require('./routes/projectRoutes');
 
 // Cargar variables de entorno
 dotenv.config();
@@ -15,8 +15,8 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Rutas
 app.get('/', (req, res) => {
@@ -25,6 +25,7 @@ app.get('/', (req, res) => {
 
 // Rutas de API
 app.use('/api/users', userRoutes);
+app.use('/api/projects', projectRoutes);
 
 // Iniciar el servidor
 app.listen(PORT, () => {
