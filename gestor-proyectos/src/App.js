@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import GanttChart from './components/GanttChart';
+import ProjectList from './components/ProjectList';
+import ProjectDetail from './components/ProjectDetail';
+import ProjectForm from './components/ProjectForm';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import { ProjectProvider } from './context/ProjectContext';
 import './App.css';
 
 function App() {
@@ -55,38 +59,42 @@ function App() {
 
   // Si el usuario está autenticado, mostrar la aplicación con rutas
   return (
-    <BrowserRouter>
-      <div className="app-container">
-        <div className="app-header">
-          <h1 className="app-title">GanttFlow</h1>
-          <div className="user-info">
-            <span className="user-greeting">Hola, {user.name}</span>
-            <button 
-              onClick={handleLogout}
-              className="logout-button"
-            >
-              Cerrar sesión
-            </button>
+    <ProjectProvider>
+      <BrowserRouter>
+        <div className="app-container">
+          <div className="app-header">
+            <h1 className="app-title">GanttFlow</h1>
+            <div className="user-info">
+              <span className="user-greeting">Hola, {user.name}</span>
+              <button 
+                onClick={handleLogout}
+                className="logout-button"
+              >
+                Cerrar sesión
+              </button>
+            </div>
           </div>
+          
+          <Routes>
+            {/* Ruta principal redirige a la lista de proyectos */}
+            <Route path="/" element={<Navigate to="/projects" />} />
+            
+            {/* Rutas para proyectos */}
+            <Route path="/projects" element={<ProjectList />} />
+            <Route path="/projects/new" element={<ProjectForm />} />
+            <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/edit" element={<ProjectForm />} />
+            
+            {/* Rutas para diagrama de Gantt */}
+            <Route path="/gantt" element={<GanttChart />} />
+            <Route path="/gantt/:id" element={<GanttChart />} />
+            
+            {/* Ruta por defecto */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
         </div>
-        
-        <Routes>
-          {/* Ruta principal redirige a la lista de proyectos */}
-          <Route path="/" element={<Navigate to="/projects" />} />
-          
-          {/* Rutas para proyectos */}
-          <Route path="/projects" element={<GanttChart />} />
-          <Route path="/projects/:id" element={<GanttChart />} />
-          
-          {/* Rutas para diagrama de Gantt */}
-          <Route path="/gantt" element={<GanttChart />} />
-          <Route path="/gantt/:id" element={<GanttChart />} />
-          
-          {/* Ruta por defecto */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ProjectProvider>
   );
 }
 

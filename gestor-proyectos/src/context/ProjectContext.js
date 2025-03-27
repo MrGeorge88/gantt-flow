@@ -1,9 +1,11 @@
-// context/ProjectContext.js
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import projectService from '../services/projectService';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { projectService } from '../services/api';
 
 // Crear el contexto
-export const ProjectContext = createContext();
+const ProjectContext = createContext();
+
+// Hook personalizado para usar el contexto
+export const useProjects = () => useContext(ProjectContext);
 
 // Proveedor del contexto
 export const ProjectProvider = ({ children }) => {
@@ -12,27 +14,23 @@ export const ProjectProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Cargar todos los proyectos al iniciar
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  // Obtener todos los proyectos
-  const fetchProjects = async () => {
+  // Cargar todos los proyectos
+  const loadProjects = async () => {
     setLoading(true);
     try {
       const data = await projectService.getAllProjects();
       setProjects(data);
       setError(null);
     } catch (err) {
-      setError('Error al cargar los proyectos: ' + err.message);
+      console.error('Error loading projects:', err);
+      setError('Error al cargar los proyectos');
     } finally {
       setLoading(false);
     }
   };
 
-  // Obtener un proyecto por ID
-  const fetchProjectById = async (id) => {
+  // Cargar proyecto por ID
+  const getProjectById = async (id) => {
     setLoading(true);
     try {
       const data = await projectService.getProjectById(id);
@@ -40,14 +38,15 @@ export const ProjectProvider = ({ children }) => {
       setError(null);
       return data;
     } catch (err) {
-      setError('Error al cargar el proyecto: ' + err.message);
+      console.error('Error loading project:', err);
+      setError('Error al cargar el proyecto');
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // Crear un nuevo proyecto
+  // Crear nuevo proyecto
   const createProject = async (projectData) => {
     setLoading(true);
     try {
@@ -56,59 +55,79 @@ export const ProjectProvider = ({ children }) => {
       setError(null);
       return newProject;
     } catch (err) {
-      setError('Error al crear el proyecto: ' + err.message);
+      console.error('Error creating project:', err);
+      setError('Error al crear el proyecto');
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // Actualizar un proyecto existente
+  // Actualizar proyecto
   const updateProject = async (id, projectData) => {
     setLoading(true);
     try {
       const updatedProject = await projectService.updateProject(id, projectData);
-      setProjects(projects.map(p => p.id === id ? updatedProject : p));
+      
+      // Actualizar la lista de proyectos
+      setProjects(projects.map(project => 
+        project.id === id ? updatedProject : project
+      ));
+      
+      // Actualizar el proyecto seleccionado si es el mismo
       if (selectedProject && selectedProject.id === id) {
         setSelectedProject(updatedProject);
       }
+      
       setError(null);
       return updatedProject;
     } catch (err) {
-      setError('Error al actualizar el proyecto: ' + err.message);
+      console.error('Error updating project:', err);
+      setError('Error al actualizar el proyecto');
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  // Eliminar un proyecto
+  // Eliminar proyecto
   const deleteProject = async (id) => {
     setLoading(true);
     try {
       await projectService.deleteProject(id);
-      setProjects(projects.filter(p => p.id !== id));
+      
+      // Actualizar la lista de proyectos
+      setProjects(projects.filter(project => project.id !== id));
+      
+      // Limpiar el proyecto seleccionado si es el mismo
       if (selectedProject && selectedProject.id === id) {
         setSelectedProject(null);
       }
+      
       setError(null);
       return true;
     } catch (err) {
-      setError('Error al eliminar el proyecto: ' + err.message);
+      console.error('Error deleting project:', err);
+      setError('Error al eliminar el proyecto');
       return false;
     } finally {
       setLoading(false);
     }
   };
 
-  // Objeto de valor del contexto
+  // Cargar proyectos al montar el componente
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  // Valores y funciones que se compartirán a través del contexto
   const value = {
     projects,
     selectedProject,
     loading,
     error,
-    fetchProjects,
-    fetchProjectById,
+    loadProjects,
+    getProjectById,
     createProject,
     updateProject,
     deleteProject,
@@ -122,11 +141,4 @@ export const ProjectProvider = ({ children }) => {
   );
 };
 
-// Hook personalizado para usar el contexto
-export const useProjects = () => {
-  const context = useContext(ProjectContext);
-  if (context === undefined) {
-    throw new Error('useProjects debe usarse dentro de un ProjectProvider');
-  }
-  return context;
-};
+export default ProjectContext;

@@ -1,15 +1,13 @@
-// components/ProjectForm.js
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useProjects } from '../context/ProjectContext';
+import { useParams, useNavigate } from 'react-router-dom';
+import { projectService } from '../services/api';
+import './ProjectForm.css';
 
 const ProjectForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = Boolean(id);
-  const { createProject, updateProject, fetchProjectById, loading, error } = useProjects();
-  
-  // Estado del formulario
+  const isEditMode = !!id;
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -17,224 +15,224 @@ const ProjectForm = () => {
     endDate: '',
     status: 'pendiente'
   });
-  
-  const [formErrors, setFormErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Cargar datos del proyecto si estamos en modo edición
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
     if (isEditMode) {
-      const loadProject = async () => {
-        const project = await fetchProjectById(id);
-        if (project) {
-          // Formatear fechas para input type="date"
-          const formatDate = (dateString) => {
-            const date = new Date(dateString);
-            return date.toISOString().split('T')[0];
-          };
-          
-          setFormData({
-            name: project.name,
-            description: project.description,
-            startDate: formatDate(project.startDate),
-            endDate: formatDate(project.endDate),
-            status: project.status
-          });
-        }
-      };
-      
-      loadProject();
+      fetchProjectDetails();
     }
-  }, [id, isEditMode, fetchProjectById]);
+  }, [id]);
 
-  // Manejar cambios en los campos del formulario
+  const fetchProjectDetails = async () => {
+    setIsLoading(true);
+    try {
+      const projectData = await projectService.getProjectById(id);
+      
+      // Formatear fechas para el formato de input date
+      const formatDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      };
+
+      setFormData({
+        name: projectData.name || '',
+        description: projectData.description || '',
+        startDate: formatDate(projectData.startDate),
+        endDate: formatDate(projectData.endDate),
+        status: projectData.status || 'pendiente'
+      });
+      
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      setError('Error al cargar los detalles del proyecto. Por favor, intenta nuevamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    setFormData(prevData => ({
+      ...prevData,
       [name]: value
     }));
-    
-    // Limpiar error del campo cuando el usuario lo modifica
-    if (formErrors[name]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
   };
 
-  // Validar el formulario
   const validateForm = () => {
-    const errors = {};
-    
     if (!formData.name.trim()) {
-      errors.name = 'El nombre del proyecto es obligatorio';
+      setError('El nombre del proyecto es obligatorio');
+      return false;
     }
-    
-    if (!formData.description.trim()) {
-      errors.description = 'La descripción es obligatoria';
+
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      
+      if (end < start) {
+        setError('La fecha de finalización no puede ser anterior a la fecha de inicio');
+        return false;
+      }
     }
-    
-    if (!formData.startDate) {
-      errors.startDate = 'La fecha de inicio es obligatoria';
-    }
-    
-    if (!formData.endDate) {
-      errors.endDate = 'La fecha de fin es obligatoria';
-    } else if (formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      errors.endDate = 'La fecha de fin debe ser posterior a la fecha de inicio';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+
+    return true;
   };
 
-  // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
-    
-    setIsSubmitting(true);
-    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
     try {
       if (isEditMode) {
-        await updateProject(id, formData);
-        alert('Proyecto actualizado con éxito');
+        await projectService.updateProject(id, formData);
       } else {
-        await createProject(formData);
-        alert('Proyecto creado con éxito');
+        await projectService.createProject(formData);
       }
+      
+      // Redirigir a la lista de proyectos después de guardar
       navigate('/projects');
-    } catch (err) {
-      console.error('Error al guardar el proyecto:', err);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      setError(`Error al ${isEditMode ? 'actualizar' : 'crear'} el proyecto. Por favor, intenta nuevamente.`);
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
+  if (isLoading) {
+    return <div className="project-form-loading">Cargando datos del proyecto...</div>;
+  }
+
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-6">
-          {isEditMode ? 'Editar Proyecto' : 'Nuevo Proyecto'}
+    <div className="project-form-container">
+      <div className="project-form-header">
+        <h1 className="project-form-title">
+          {isEditMode ? 'Editar Proyecto' : 'Crear Nuevo Proyecto'}
         </h1>
-        
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-gray-700 text-sm font-bold mb-2">
-              Nombre del Proyecto *
+        <button
+          type="button"
+          onClick={() => navigate('/projects')}
+          className="back-button"
+        >
+          Volver a la lista
+        </button>
+      </div>
+
+      {error && (
+        <div className="form-error-message">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="project-form">
+        <div className="form-group">
+          <label htmlFor="name" className="form-label">
+            Nombre del Proyecto <span className="required">*</span>
+          </label>
+          <input
+            id="name"
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="form-input"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="description" className="form-label">
+            Descripción
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            className="form-textarea"
+            rows="4"
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="startDate" className="form-label">
+              Fecha de Inicio
             </label>
             <input
-              type="text"
-              id="name"
-              name="name"
-              className={`w-full p-2 border rounded ${formErrors.name ? 'border-red-500' : 'border-gray-300'}`}
-              value={formData.name}
+              id="startDate"
+              type="date"
+              name="startDate"
+              value={formData.startDate}
               onChange={handleChange}
+              className="form-input"
             />
-            {formErrors.name && (
-              <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-            )}
           </div>
-          
-          <div className="mb-4">
-            <label htmlFor="description" className="block text-gray-700 text-sm font-bold mb-2">
-              Descripción *
+
+          <div className="form-group">
+            <label htmlFor="endDate" className="form-label">
+              Fecha de Finalización
             </label>
-            <textarea
-              id="description"
-              name="description"
-              rows="4"
-              className={`w-full p-2 border rounded ${formErrors.description ? 'border-red-500' : 'border-gray-300'}`}
-              value={formData.description}
+            <input
+              id="endDate"
+              type="date"
+              name="endDate"
+              value={formData.endDate}
               onChange={handleChange}
-            ></textarea>
-            {formErrors.description && (
-              <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
+              className="form-input"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="status" className="form-label">
+            Estado
+          </label>
+          <select
+            id="status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="form-select"
+          >
+            <option value="pendiente">Pendiente</option>
+            <option value="en_progreso">En Progreso</option>
+            <option value="completado">Completado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        <div className="form-actions">
+          <button
+            type="button"
+            onClick={() => navigate('/projects')}
+            className="cancel-button"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="save-button"
+          >
+            {isSaving ? (
+              isEditMode ? 'Actualizando...' : 'Creando...'
+            ) : (
+              isEditMode ? 'Actualizar Proyecto' : 'Crear Proyecto'
             )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="startDate" className="block text-gray-700 text-sm font-bold mb-2">
-                Fecha de Inicio *
-              </label>
-              <input
-                type="date"
-                id="startDate"
-                name="startDate"
-                className={`w-full p-2 border rounded ${formErrors.startDate ? 'border-red-500' : 'border-gray-300'}`}
-                value={formData.startDate}
-                onChange={handleChange}
-              />
-              {formErrors.startDate && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="endDate" className="block text-gray-700 text-sm font-bold mb-2">
-                Fecha de Fin *
-              </label>
-              <input
-                type="date"
-                id="endDate"
-                name="endDate"
-                className={`w-full p-2 border rounded ${formErrors.endDate ? 'border-red-500' : 'border-gray-300'}`}
-                value={formData.endDate}
-                onChange={handleChange}
-              />
-              {formErrors.endDate && (
-                <p className="text-red-500 text-xs mt-1">{formErrors.endDate}</p>
-              )}
-            </div>
-          </div>
-          
-          <div className="mb-6">
-            <label htmlFor="status" className="block text-gray-700 text-sm font-bold mb-2">
-              Estado
-            </label>
-            <select
-              id="status"
-              name="status"
-              className="w-full p-2 border border-gray-300 rounded"
-              value={formData.status}
-              onChange={handleChange}
-            >
-              <option value="pendiente">Pendiente</option>
-              <option value="en_progreso">En Progreso</option>
-              <option value="completado">Completado</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-          
-          <div className="flex justify-end space-x-4">
-            <button
-              type="button"
-              className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
-              onClick={() => navigate('/projects')}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className={`bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={isSubmitting || loading}
-            >
-              {isSubmitting ? 'Guardando...' : isEditMode ? 'Actualizar Proyecto' : 'Crear Proyecto'}
-            </button>
-          </div>
-        </form>
-      </div>
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

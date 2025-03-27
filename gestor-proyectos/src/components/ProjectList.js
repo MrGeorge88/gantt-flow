@@ -1,220 +1,232 @@
-// components/ProjectList.js
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useProjects } from '../context/ProjectContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { projectService } from '../services/api';
+import './ProjectList.css';
 
 const ProjectList = () => {
-  const { projects, loading, error, fetchProjects, deleteProject } = useProjects();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
-  const [sortOption, setSortOption] = useState('updatedAt');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('updatedAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
-  // Filtrar y ordenar proyectos
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (projects) {
-      let filtered = [...projects];
-      
-      // Aplicar filtro de búsqueda
-      if (searchTerm) {
-        filtered = filtered.filter(
-          project => 
-            project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            project.description.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    // Aplicar filtro y ordenamiento cuando cambian los proyectos o criterios
+    const filtered = projects.filter(project => 
+      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+
+      // Manejar fechas
+      if (sortBy === 'startDate' || sortBy === 'endDate' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+        aValue = new Date(aValue || 0);
+        bValue = new Date(bValue || 0);
       }
-      
-      // Aplicar ordenamiento
-      filtered = filtered.sort((a, b) => {
-        if (sortOption === 'name') {
-          return sortDirection === 'asc' 
-            ? a.name.localeCompare(b.name) 
-            : b.name.localeCompare(a.name);
-        } else if (sortOption === 'status') {
-          return sortDirection === 'asc' 
-            ? a.status.localeCompare(b.status) 
-            : b.status.localeCompare(a.status);
-        } else if (sortOption === 'startDate') {
-          return sortDirection === 'asc' 
-            ? new Date(a.startDate) - new Date(b.startDate) 
-            : new Date(b.startDate) - new Date(a.startDate);
-        } else if (sortOption === 'endDate') {
-          return sortDirection === 'asc' 
-            ? new Date(a.endDate) - new Date(b.endDate) 
-            : new Date(b.endDate) - new Date(a.endDate);
-        } else { // updatedAt por defecto
-          return sortDirection === 'asc' 
-            ? new Date(a.updatedAt) - new Date(b.updatedAt) 
-            : new Date(b.updatedAt) - new Date(a.updatedAt);
-        }
-      });
-      
-      setFilteredProjects(filtered);
-    }
-  }, [projects, searchTerm, sortOption, sortDirection]);
 
-  // Manejar cambio de ordenamiento
-  const handleSortChange = (option) => {
-    if (sortOption === option) {
-      // Si ya estamos ordenando por esta opción, cambiamos la dirección
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    setFilteredProjects(sorted);
+  }, [projects, searchTerm, sortBy, sortOrder]);
+
+  const fetchProjects = async () => {
+    setIsLoading(true);
+    try {
+      const data = await projectService.getAllProjects();
+      setProjects(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setError('Error al cargar los proyectos. Por favor, intenta nuevamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      // Si ya estamos ordenando por este campo, cambiamos el orden
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
-      // Si es una nueva opción, establecemos esta opción y dirección por defecto
-      setSortOption(option);
-      setSortDirection('desc');
+      // Si es un nuevo campo, lo establecemos y ponemos orden descendente por defecto
+      setSortBy(field);
+      setSortOrder('desc');
     }
   };
 
-  // Función para confirmar y eliminar un proyecto
-  const handleDeleteProject = (id, name) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar el proyecto "${name}"?`)) {
-      deleteProject(id).then(success => {
-        if (success) {
-          alert('Proyecto eliminado con éxito');
-        }
-      });
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleDeleteProject = async (id, e) => {
+    e.preventDefault(); // Evitar que el evento se propague al enlace
+    e.stopPropagation();
+
+    if (window.confirm('¿Estás seguro de que deseas eliminar este proyecto?')) {
+      try {
+        await projectService.deleteProject(id);
+        // Actualizar la lista de proyectos después de eliminar
+        setProjects(projects.filter(project => project.id !== id));
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        setError('Error al eliminar el proyecto. Por favor, intenta nuevamente.');
+      }
     }
   };
 
-  const getStatusClass = (status) => {
+  const getStatusColor = (status) => {
     switch (status) {
-      case 'pendiente': return 'bg-yellow-200 text-yellow-800';
-      case 'en_progreso': return 'bg-blue-200 text-blue-800';
-      case 'completado': return 'bg-green-200 text-green-800';
-      case 'cancelado': return 'bg-red-200 text-red-800';
-      default: return 'bg-gray-200 text-gray-800';
+      case 'pendiente':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'en_progreso':
+        return 'bg-blue-100 text-blue-800';
+      case 'completado':
+        return 'bg-green-100 text-green-800';
+      case 'cancelado':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pendiente': return 'Pendiente';
-      case 'en_progreso': return 'En Progreso';
-      case 'completado': return 'Completado';
-      case 'cancelado': return 'Cancelado';
-      default: return status;
-    }
+  const getSortIcon = (field) => {
+    if (sortBy !== field) return '↕';
+    return sortOrder === 'asc' ? '↑' : '↓';
   };
-
-  if (loading) return <div className="text-center my-8">Cargando proyectos...</div>;
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Mis Proyectos</h1>
-        <Link to="/projects/new" className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">
-          Nuevo Proyecto
-        </Link>
+    <div className="project-list-container">
+      <div className="project-list-header">
+        <h1 className="project-list-title">Mis Proyectos</h1>
+        <button 
+          className="create-project-button"
+          onClick={() => navigate('/projects/new')}
+        >
+          + Nuevo Proyecto
+        </button>
+      </div>
+
+      <div className="project-list-controls">
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Buscar proyectos..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="search-input"
+          />
+        </div>
+        <div className="sort-controls">
+          <span>Ordenar por:</span>
+          <select 
+            value={`${sortBy}-${sortOrder}`}
+            onChange={(e) => {
+              const [field, order] = e.target.value.split('-');
+              setSortBy(field);
+              setSortOrder(order);
+            }}
+            className="sort-select"
+          >
+            <option value="name-asc">Nombre (A-Z)</option>
+            <option value="name-desc">Nombre (Z-A)</option>
+            <option value="updatedAt-desc">Última modificación</option>
+            <option value="createdAt-desc">Fecha de creación</option>
+            <option value="startDate-asc">Fecha de inicio</option>
+            <option value="endDate-asc">Fecha de finalización</option>
+          </select>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="error-message">
           {error}
         </div>
       )}
 
-      <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Buscar proyectos..."
-          className="w-full p-2 border border-gray-300 rounded"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSortChange('name')}
+      {isLoading ? (
+        <div className="loading-message">Cargando proyectos...</div>
+      ) : filteredProjects.length > 0 ? (
+        <div className="projects-grid">
+          {filteredProjects.map(project => (
+            <Link 
+              to={`/projects/${project.id}`} 
+              key={project.id}
+              className="project-card"
+            >
+              <div className="project-card-header">
+                <h2 className="project-card-title">{project.name}</h2>
+                <div className={`project-status ${getStatusColor(project.status)}`}>
+                  {project.status?.replace('_', ' ')}
+                </div>
+              </div>
+              
+              <p className="project-card-description">
+                {project.description || 'Sin descripción'}
+              </p>
+              
+              <div className="project-card-footer">
+                <div className="project-card-dates">
+                  {project.startDate && (
+                    <span>Inicio: {new Date(project.startDate).toLocaleDateString()}</span>
+                  )}
+                  {project.endDate && (
+                    <span>Fin: {new Date(project.endDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+                
+                <div className="project-card-actions">
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigate(`/projects/${project.id}/edit`);
+                    }}
+                    className="edit-button"
+                  >
+                    Editar
+                  </button>
+                  <button 
+                    onClick={(e) => handleDeleteProject(project.id, e)}
+                    className="delete-button"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="no-projects-message">
+          {searchTerm ? (
+            <p>No se encontraron proyectos que coincidan con "{searchTerm}"</p>
+          ) : (
+            <>
+              <p>No tienes proyectos creados</p>
+              <button 
+                onClick={() => navigate('/projects/new')}
+                className="create-first-project-button"
               >
-                Nombre
-                {sortOption === 'name' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSortChange('status')}
-              >
-                Estado
-                {sortOption === 'status' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSortChange('startDate')}
-              >
-                Fecha de Inicio
-                {sortOption === 'startDate' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSortChange('endDate')}
-              >
-                Fecha de Fin
-                {sortOption === 'endDate' && (
-                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                )}
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project) => (
-                <tr key={project.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Link to={`/projects/${project.id}`} className="text-blue-600 hover:text-blue-900 font-medium">
-                      {project.name}
-                    </Link>
-                    <p className="text-gray-500 text-sm mt-1 truncate max-w-xs">{project.description}</p>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(project.status)}`}>
-                      {getStatusText(project.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(project.startDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(project.endDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link to={`/projects/${project.id}`} className="text-blue-600 hover:text-blue-900 mr-3">
-                      Ver
-                    </Link>
-                    <Link to={`/projects/${project.id}/edit`} className="text-indigo-600 hover:text-indigo-900 mr-3">
-                      Editar
-                    </Link>
-                    <button
-                      onClick={() => handleDeleteProject(project.id, project.name)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                  No se encontraron proyectos
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                Crear mi primer proyecto
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

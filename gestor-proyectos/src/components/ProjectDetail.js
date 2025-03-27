@@ -1,198 +1,330 @@
-// components/ProjectDetail.js
-import React, { useEffect, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useProjects } from '../context/ProjectContext';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { projectService } from '../services/api';
+import './ProjectDetail.css';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fetchProjectById, deleteProject, loading, error } = useProjects();
+  
   const [project, setProject] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    const loadProject = async () => {
-      const projectData = await fetchProjectById(id);
-      setProject(projectData);
-    };
-    
-    loadProject();
-  }, [id, fetchProjectById]);
+    fetchProjectDetails();
+  }, [id]);
 
-  const handleDeleteProject = () => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar el proyecto "${project.name}"?`)) {
-      deleteProject(id).then(success => {
-        if (success) {
-          alert('Proyecto eliminado con éxito');
-          navigate('/projects');
-        }
-      });
-    }
-  };
-
-  const getStatusClass = (status) => {
-    switch (status) {
-      case 'pendiente': return 'bg-yellow-200 text-yellow-800';
-      case 'en_progreso': return 'bg-blue-200 text-blue-800';
-      case 'completado': return 'bg-green-200 text-green-800';
-      case 'cancelado': return 'bg-red-200 text-red-800';
-      default: return 'bg-gray-200 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pendiente': return 'Pendiente';
-      case 'en_progreso': return 'En Progreso';
-      case 'completado': return 'Completado';
-      case 'cancelado': return 'Cancelado';
-      default: return status;
+  const fetchProjectDetails = async () => {
+    setIsLoading(true);
+    try {
+      const data = await projectService.getProjectById(id);
+      setProject(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      setError('Error al cargar los detalles del proyecto. Por favor, intenta nuevamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    if (!dateString) return 'No definida';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
   };
 
-  if (loading) return <div className="text-center my-8">Cargando detalles del proyecto...</div>;
-  
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'pendiente':
+        return 'Pendiente';
+      case 'en_progreso':
+        return 'En Progreso';
+      case 'completado':
+        return 'Completado';
+      case 'cancelado':
+        return 'Cancelado';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pendiente':
+        return 'status-pending';
+      case 'en_progreso':
+        return 'status-in-progress';
+      case 'completado':
+        return 'status-completed';
+      case 'cancelado':
+        return 'status-cancelled';
+      default:
+        return '';
+    }
+  };
+
+  const calculateProgress = () => {
+    if (!project || !project.tasks || project.tasks.length === 0) {
+      return 0;
+    }
+
+    const totalTasks = project.tasks.length;
+    const completedTasks = project.tasks.filter(task => task.progress === 100).length;
+    
+    return Math.round((completedTasks / totalTasks) * 100);
+  };
+
+  const handleDeleteProject = async () => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este proyecto?')) {
+      try {
+        await projectService.deleteProject(id);
+        navigate('/projects');
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        setError('Error al eliminar el proyecto. Por favor, intenta nuevamente.');
+      }
+    }
+  };
+
+  if (isLoading) {
+    return <div className="project-detail-loading">Cargando detalles del proyecto...</div>;
+  }
+
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-        <button 
-          onClick={() => navigate('/projects')}
-          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
-        >
-          Volver a Proyectos
+      <div className="project-detail-error">
+        <p>{error}</p>
+        <button onClick={() => navigate('/projects')} className="back-to-list-button">
+          Volver a la lista de proyectos
         </button>
       </div>
     );
   }
 
-  if (!project) return <div className="text-center my-8">Proyecto no encontrado</div>;
+  if (!project) {
+    return (
+      <div className="project-not-found">
+        <p>Proyecto no encontrado</p>
+        <button onClick={() => navigate('/projects')} className="back-to-list-button">
+          Volver a la lista de proyectos
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{project.name}</h1>
-        <div className="space-x-2">
-          <Link 
-            to="/projects" 
-            className="bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded"
-          >
-            Volver
+    <div className="project-detail-container">
+      <div className="project-detail-header">
+        <div className="project-header-left">
+          <h1 className="project-title">{project.name}</h1>
+          <div className={`project-status ${getStatusColor(project.status)}`}>
+            {getStatusLabel(project.status)}
+          </div>
+        </div>
+        <div className="project-actions">
+          <Link to={`/gantt/${id}`} className="gantt-button">
+            Ver Diagrama Gantt
           </Link>
-          <Link 
-            to={`/projects/${id}/edit`} 
-            className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"
+          <button 
+            onClick={() => navigate(`/projects/${id}/edit`)}
+            className="edit-project-button"
           >
             Editar
-          </Link>
-          <button
+          </button>
+          <button 
             onClick={handleDeleteProject}
-            className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded"
+            className="delete-project-button"
           >
             Eliminar
           </button>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Descripción</h2>
-                <p className="text-gray-700">{project.description}</p>
-              </div>
+      <div className="project-progress-section">
+        <div className="progress-info">
+          <span className="progress-label">Progreso general:</span>
+          <span className="progress-percentage">{calculateProgress()}%</span>
+        </div>
+        <div className="progress-bar-container">
+          <div 
+            className="progress-bar" 
+            style={{ width: `${calculateProgress()}%` }}
+          ></div>
+        </div>
+      </div>
 
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Estado</h2>
-                <span className={`px-3 py-1 rounded-full text-sm ${getStatusClass(project.status)}`}>
-                  {getStatusText(project.status)}
-                </span>
-              </div>
-            </div>
+      <div className="project-tabs">
+        <button 
+          className={`tab-button ${activeTab === 'overview' ? 'active-tab' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Resumen
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'tasks' ? 'active-tab' : ''}`}
+          onClick={() => setActiveTab('tasks')}
+        >
+          Tareas
+        </button>
+        <button 
+          className={`tab-button ${activeTab === 'members' ? 'active-tab' : ''}`}
+          onClick={() => setActiveTab('members')}
+        >
+          Miembros
+        </button>
+      </div>
 
-            <div>
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Fechas</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Fecha de Inicio</p>
-                    <p className="font-medium">{formatDate(project.startDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Fecha de Fin</p>
-                    <p className="font-medium">{formatDate(project.endDate)}</p>
-                  </div>
+      <div className="tab-content">
+        {activeTab === 'overview' && (
+          <div className="overview-tab">
+            <div className="info-card">
+              <h2 className="info-card-title">Información del Proyecto</h2>
+              <div className="info-rows">
+                <div className="info-row">
+                  <span className="info-label">Descripción:</span>
+                  <p className="info-value">{project.description || 'Sin descripción'}</p>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Fecha de inicio:</span>
+                  <span className="info-value">{formatDate(project.startDate)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Fecha de finalización:</span>
+                  <span className="info-value">{formatDate(project.endDate)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Fecha de creación:</span>
+                  <span className="info-value">{formatDate(project.createdAt)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Última actualización:</span>
+                  <span className="info-value">{formatDate(project.updatedAt)}</span>
                 </div>
               </div>
+            </div>
 
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Miembros</h2>
-                {project.members && project.members.length > 0 ? (
-                  <ul className="space-y-2">
-                    {project.members.map((member, index) => (
-                      <li key={index} className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white">
-                          {member.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span>{member.name}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500">No hay miembros asignados</p>
-                )}
+            <div className="info-card">
+              <h2 className="info-card-title">Estadísticas</h2>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <span className="stat-value">{project.tasks?.length || 0}</span>
+                  <span className="stat-label">Tareas totales</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-value">
+                    {project.tasks?.filter(task => task.progress === 100).length || 0}
+                  </span>
+                  <span className="stat-label">Tareas completadas</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-value">{project.members?.length || 0}</span>
+                  <span className="stat-label">Miembros</span>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold mb-4">Tareas</h2>
+        {activeTab === 'tasks' && (
+          <div className="tasks-tab">
+            <div className="tasks-header">
+              <h2 className="section-title">Tareas del Proyecto</h2>
+              <button className="add-task-button">+ Agregar tarea</button>
+            </div>
+
             {project.tasks && project.tasks.length > 0 ? (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <ul className="divide-y divide-gray-200">
-                  {project.tasks.map((task, index) => (
-                    <li key={index} className="py-3">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={task.completed}
-                          readOnly
-                          className="mr-3"
-                        />
-                        <div>
-                          <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
-                            {task.title}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(task.dueDate)}
-                          </p>
+              <div className="tasks-list">
+                <div className="task-list-header">
+                  <span className="task-name-header">Nombre</span>
+                  <span className="task-assignee-header">Asignado a</span>
+                  <span className="task-dates-header">Fechas</span>
+                  <span className="task-priority-header">Prioridad</span>
+                  <span className="task-progress-header">Progreso</span>
+                </div>
+                
+                {project.tasks.map(task => (
+                  <div key={task.id} className="task-item">
+                    <div className="task-name">
+                      <input 
+                        type="checkbox" 
+                        checked={task.progress === 100} 
+                        readOnly 
+                        className="task-checkbox"
+                      />
+                      <span>{task.title}</span>
+                    </div>
+                    <div className="task-assignee">
+                      {task.assignedTo && task.assignedTo.length > 0 ? (
+                        <div className="assignee-avatar">
+                          {task.assignedTo[0].substring(0, 2).toUpperCase()}
                         </div>
+                      ) : (
+                        <span className="no-assignee">Sin asignar</span>
+                      )}
+                    </div>
+                    <div className="task-dates">
+                      <span>{formatDate(task.startDate)}</span>
+                      <span>-</span>
+                      <span>{formatDate(task.endDate)}</span>
+                    </div>
+                    <div className="task-priority">
+                      <span className={`priority-badge priority-${task.priority}`}>
+                        {task.priority}
+                      </span>
+                    </div>
+                    <div className="task-progress">
+                      <div className="task-progress-bar-container">
+                        <div 
+                          className="task-progress-bar" 
+                          style={{ width: `${task.progress}%` }}
+                        ></div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                      <span className="task-progress-text">{task.progress}%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
-              <p className="text-gray-500">No hay tareas para este proyecto</p>
+              <div className="no-tasks-message">
+                <p>No hay tareas creadas para este proyecto</p>
+                <button className="add-first-task-button">Crear la primera tarea</button>
+              </div>
             )}
-            
-            <div className="mt-4">
-              <Link 
-                to={`/projects/${id}/tasks/new`} 
-                className="text-blue-600 hover:text-blue-800"
-              >
-                + Añadir nueva tarea
-              </Link>
-            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div className="members-tab">
+            <div className="members-header">
+              <h2 className="section-title">Miembros del Proyecto</h2>
+              <button className="invite-member-button">+ Invitar miembro</button>
+            </div>
+
+            {project.members && project.members.length > 0 ? (
+              <div className="members-list">
+                {project.members.map((member, index) => (
+                  <div key={index} className="member-card">
+                    <div className="member-avatar">
+                      {member.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="member-info">
+                      <span className="member-name">{member}</span>
+                      <span className="member-role">Miembro</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-members-message">
+                <p>No hay miembros en este proyecto</p>
+                <button className="invite-first-member-button">Invitar al primer miembro</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
