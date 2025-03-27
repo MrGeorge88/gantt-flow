@@ -1,5 +1,5 @@
 // En un entorno de desarrollo local, usa localhost
-const API_URL = 'https://bookish-spoon-94gw959q94vfg4g-3001.app.github.dev/';
+const API_URL = 'http://localhost:3001/api/';
 
 // Si estás en un entorno de Codespaces, usa la URL pública
 // Para obtener la URL, ve a la pestaña de PORTS en Codespaces
